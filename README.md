@@ -1,22 +1,20 @@
 # 🫧 Components V2 com TypeScript
 
-Esse guia mostra como usar Components V2 no Discord com TypeScript de um jeito simples e sem enrolação. A ideia é ter uma base limpa que você consegue encaixar em qualquer bot sem virar bagunça depois.
+Um guia objetivo sobre como utilizar Components V2 no Discord com TypeScript. A proposta é apresentar uma base limpa e bem estruturada, fácil de escalar em projetos maiores.
 
 ---
 
 ## Sobre Components V2
 
-Basicamente os Components V2 são uma forma nova de montar mensagens no Discord. Em vez de usar embed + content como sempre foi, você monta o layout inteiro com componentes — texto, seções, botões, menus, tudo junto e organizado.
+Os Components V2 permitem construir interfaces ricas dentro do Discord utilizando uma abordagem baseada inteiramente em componentes. Em vez de combinar `content` e `embeds`, o layout é montado com blocos como texto, seções, botões e menus — tudo dentro de um `ContainerBuilder`.
 
-Funciona muito bem pra painéis, dashboards e qualquer coisa interativa dentro do servidor. Com TypeScript então, fica bem mais tranquilo de manter sem quebrar tudo quando o projeto começa a crescer.
+É especialmente útil para painéis interativos, dashboards e sistemas de configuração. Com TypeScript, a manutenção e a evolução do projeto se tornam muito mais previsíveis.
 
-> ⚠️ Precisa do discord.js `14.19.3` pra cima. Confirma com `npm list discord.js` antes de começar.
+> ⚠️ Requer discord.js `14.19.3` ou superior. Verifique com `npm list discord.js`.
 
 ---
 
 ## Dependências
-
-Instala tudo com esses dois comandos:
 
 ```bash
 npm install discord.js@latest dotenv
@@ -25,7 +23,7 @@ npm install -D typescript ts-node @types/node
 
 ---
 
-## Docs
+## Documentação
 
 - [Discord API — Components](https://discord.com/developers/docs/components/reference)
 - [discord.js — Display Components](https://discordjs.guide/legacy/popular-topics/display-components)
@@ -36,7 +34,7 @@ npm install -D typescript ts-node @types/node
 
 ## Estrutura do projeto
 
-Nada muito complexo, só o suficiente pra manter as coisas no lugar:
+Estrutura básica recomendada para manter o projeto organizado desde o início:
 
 ```
 src/
@@ -49,19 +47,19 @@ src/
 └── index.ts
 ```
 
-Separar builders de handlers já resolve 90% dos casos onde o código vira uma bagunça.
+Separar builders de handlers evita arquivos extensos e facilita a manutenção.
 
 ---
 
 ## Como o layout funciona no Container
 
-Antes de sair codando vale entender uma coisa: o `ContainerBuilder` é sempre o componente raiz. Tudo que você quiser mostrar vai dentro dele. Pensa nele como a caixa que agrupa o layout inteiro.
+O `ContainerBuilder` é o componente raiz — todos os demais elementos são adicionados dentro dele para compor o layout da mensagem.
 
 ```
-ContainerBuilder               ← a caixa que segura tudo
+ContainerBuilder               ← componente raiz do layout
 ├── TextDisplayBuilder         ← texto com markdown (substitui o content)
-├── SeparatorBuilder           ← um traço pra separar as seções
-├── SectionBuilder             ← texto com um botão ou imagem do lado
+├── SeparatorBuilder           ← divisória visual entre blocos
+├── SectionBuilder             ← texto com botão ou thumbnail como acessório
 │   ├── TextDisplayBuilder (até 3)
 │   └── ButtonBuilder ou ThumbnailBuilder
 ├── ActionRowBuilder           ← linha de botões ou select menus
@@ -70,13 +68,13 @@ ContainerBuilder               ← a caixa que segura tudo
 └── MediaGalleryBuilder        ← grade de até 10 imagens
 ```
 
-> ⚠️ Uma coisa importante: quando você usa `IsComponentsV2`, não rola mais mandar `content`, `embeds` ou `stickers` junto. Usa o `TextDisplayBuilder` no lugar do content e tá resolvido.
+> ⚠️ Ao utilizar `IsComponentsV2`, os campos `content`, `embeds` e `stickers` não são permitidos na mensagem. Utilize `TextDisplayBuilder` no lugar do `content`.
 
 ---
 
 ## Tipagem de customId
 
-Padronizar os customId é uma daquelas coisas que parece bobagem no começo mas salva muito tempo depois. Cria um encode/decode simples e usa em tudo:
+Padronizar os `customId` evita erros e torna o código mais previsível conforme o bot cresce:
 
 ```ts
 export type CustomIdData = {
@@ -123,7 +121,7 @@ import { createClient } from "./client/createClient"
 const client = createClient()
 
 client.once("clientReady", () => {
-  console.log(`Bot online ${client.user?.tag}`)
+  console.log(`Bot online: ${client.user?.tag}`)
 })
 
 client.login(process.env.DISCORD_TOKEN)
@@ -133,7 +131,7 @@ client.login(process.env.DISCORD_TOKEN)
 
 ## Criando um painel com Container, botão e select
 
-Aqui é onde a mágica acontece. Tudo montado dentro do `ContainerBuilder` — cabeçalho, seção de tickets com botão do lado, select menu e botão de configuração:
+Exemplo completo utilizando `ContainerBuilder` como layout raiz, com cabeçalho, seção com botão acessório, select menu e botão de ação:
 
 ```ts
 import {
@@ -153,7 +151,7 @@ import { encodeCustomId } from "./utils/customId"
 export function buildPanel() {
 
   const header = new TextDisplayBuilder()
-    .setContent("#Painel de Gerenciamento\nEscolha um módulo abaixo.")
+    .setContent("# Painel de Gerenciamento\nSelecione um módulo abaixo.")
 
   const separator = new SeparatorBuilder()
     .setDivider(true)
@@ -173,7 +171,7 @@ export function buildPanel() {
 
   const select = new StringSelectMenuBuilder()
     .setCustomId(encodeCustomId({ action: "menu" }))
-    .setPlaceholder("Escolha um módulo")
+    .setPlaceholder("Selecione um módulo")
     .addOptions(
       { label: "Tickets", value: "tickets" },
       { label: "Logs", value: "logs" },
@@ -210,7 +208,7 @@ export function buildPanel() {
 
 ## Handlers separados
 
-Em vez de jogar toda a lógica no evento, separa cada tipo de interação num arquivo próprio. Fica muito mais fácil de achar e mexer depois.
+Centralizar toda a lógica no evento `interactionCreate` torna o código difícil de manter. O recomendado é separar cada tipo de interação em seu próprio arquivo:
 
 **`handlers/buttons.ts`**
 ```ts
@@ -222,11 +220,11 @@ export async function handleButton(interaction: ButtonInteraction) {
   if (!data) return
 
   if (data.action === "config") {
-    await interaction.reply({ content: "Abrindo configuração", flags: 64 })
+    await interaction.reply({ content: "Abrindo configurações.", flags: 64 })
   }
 
   if (data.action === "tickets") {
-    await interaction.reply({ content: "Sistema de tickets", flags: 64 })
+    await interaction.reply({ content: "Sistema de tickets.", flags: 64 })
   }
 }
 ```
@@ -239,12 +237,12 @@ export async function handleSelectMenu(interaction: StringSelectMenuInteraction)
   const value = interaction.values[0]
 
   const respostas: Record<string, string> = {
-    tickets: "Sistema de tickets",
-    logs: "Sistema de logs",
-    mod: "Sistema de moderação"
+    tickets: "Módulo de tickets carregado.",
+    logs: "Módulo de logs carregado.",
+    mod: "Módulo de moderação carregado."
   }
 
-  await interaction.reply({ content: respostas[value] ?? "Módulo não encontrado" })
+  await interaction.reply({ content: respostas[value] ?? "Módulo não encontrado." })
 }
 ```
 
@@ -252,7 +250,7 @@ export async function handleSelectMenu(interaction: StringSelectMenuInteraction)
 
 ## interactionCreate
 
-Com os handlers separados, o evento fica limpo e só faz o roteamento:
+Com os handlers separados, o evento concentra apenas o roteamento das interações:
 
 ```ts
 import { Client, Events } from "discord.js"
@@ -284,389 +282,10 @@ interaction.reply(panel)
 
 ---
 
-## Algumas boas práticas
-
-- Separe handlers sempre que possível, evento limpo é evento feliz
-- Não coloca lógica pesada dentro de eventos, delega pra funções
-- Padroniza os customId com encode/decode desde o começo
-- TypeScript tá aí pra ajudar, deixa ele reclamar antes de você descobrir o bug em prod
-- Respeita os limites do Discord: no máximo **40 componentes** por mensagem e **4000 caracteres** de texto no total
-
-> 💡 Ao usar `IsComponentsV2`, você **não pode** incluir `content`, `embeds` ou `stickers` na mensagem. Use `TextDisplayBuilder` no lugar do content.
-
----
-
-## Tipagem de customId
-
-Uma boa prática é padronizar os customId. Isso evita erro e deixa o código mais previsível.
-
-```ts
-export type CustomIdData = {
-  action: string
-  userId?: string
-  page?: number
-}
-
-export function encodeCustomId(data: CustomIdData) {
-  return JSON.stringify(data)
-}
-
-export function decodeCustomId(id: string): CustomIdData | null {
-  try {
-    return JSON.parse(id)
-  } catch {
-    return null
-  }
-}
-```
-
-Isso ajuda bastante quando o bot começa a crescer.
-
----
-
-## Criando o client
-
-```ts
-import { Client, GatewayIntentBits } from "discord.js"
-
-export function createClient() {
-  return new Client({
-    intents: [GatewayIntentBits.Guilds]
-  })
-}
-```
-
----
-
-## Arquivo principal
-
-```ts
-import "dotenv/config"
-import { createClient } from "./client/createClient"
-
-const client = createClient()
-
-client.once("clientReady", () => {
-  console.log(`Bot online ${client.user?.tag}`)
-})
-
-client.login(process.env.DISCORD_TOKEN)
-```
-
----
-
-## Criando um painel com Container, botão e select
-
-Aqui está um exemplo usando o `ContainerBuilder` como layout raiz, com seções, separador, botões e menu de seleção dentro dele.
-
-```ts
-import {
-  ContainerBuilder,
-  TextDisplayBuilder,
-  SeparatorBuilder,
-  SeparatorSpacingSize,
-  SectionBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  StringSelectMenuBuilder,
-  MessageFlags
-} from "discord.js"
-import { encodeCustomId } from "./utils/customId"
-
-export function buildPanel() {
-
-  const header = new TextDisplayBuilder()
-    .setContent("# Painel de Gerenciamento\nEscolha um módulo abaixo.")
-
-  const separator = new SeparatorBuilder()
-    .setDivider(true)
-    .setSpacing(SeparatorSpacingSize.Small)
-
-  const ticketsSection = new SectionBuilder()
-    .addTextDisplayComponents(
-      new TextDisplayBuilder().setContent("**Tickets**"),
-      new TextDisplayBuilder().setContent("Abra e gerencie tickets de suporte.")
-    )
-    .setButtonAccessory(
-      new ButtonBuilder()
-        .setCustomId(encodeCustomId({ action: "tickets" }))
-        .setLabel("Acessar")
-        .setStyle(ButtonStyle.Primary)
-    )
-
-  const select = new StringSelectMenuBuilder()
-    .setCustomId(encodeCustomId({ action: "menu" }))
-    .setPlaceholder("Escolha um módulo")
-    .addOptions(
-      { label: "Tickets", value: "tickets" },
-      { label: "Logs", value: "logs" },
-      { label: "Moderação", value: "mod" }
-    )
-
-  const rowMenu = new ActionRowBuilder<StringSelectMenuBuilder>()
-    .addComponents(select)
-
-  const btnConfig = new ButtonBuilder()
-    .setCustomId(encodeCustomId({ action: "config" }))
-    .setLabel("Configurações")
-    .setStyle(ButtonStyle.Secondary)
-
-  const rowButtons = new ActionRowBuilder<ButtonBuilder>()
-    .addComponents(btnConfig)
-
-  const container = new ContainerBuilder()
-    .setAccentColor(0x5865f2)
-    .addTextDisplayComponents(header)
-    .addSeparatorComponents(separator)
-    .addSectionComponents(ticketsSection)
-    .addActionRowComponents(rowMenu)
-    .addActionRowComponents(rowButtons)
-
-  return {
-    components: [container],
-    flags: MessageFlags.IsComponentsV2
-  }
-}
-```
-
----
-
-## Handlers separados
-
-Separar os handlers evita deixar o evento `interactionCreate` gigante.
-
-**`handlers/buttons.ts`**
-```ts
-import { ButtonInteraction } from "discord.js"
-import { decodeCustomId } from "../utils/customId"
-
-export async function handleButton(interaction: ButtonInteraction) {
-  const data = decodeCustomId(interaction.customId)
-  if (!data) return
-
-  if (data.action === "config") {
-    await interaction.reply({ content: "Abrindo configuração", flags: 64 })
-  }
-
-  if (data.action === "tickets") {
-    await interaction.reply({ content: "Sistema de tickets", flags: 64 })
-  }
-}
-```
-
-**`handlers/selectMenus.ts`**
-```ts
-import { StringSelectMenuInteraction } from "discord.js"
-
-export async function handleSelectMenu(interaction: StringSelectMenuInteraction) {
-  const value = interaction.values[0]
-
-  const respostas: Record<string, string> = {
-    tickets: "Sistema de tickets",
-    logs: "Sistema de logs",
-    mod: "Sistema de moderação"
-  }
-
-  await interaction.reply({ content: respostas[value] ?? "Módulo não encontrado" })
-}
-```
-
----
-
-## interactionCreate
-
-```ts
-import { Client, Events } from "discord.js"
-import { handleButton } from "../handlers/buttons"
-import { handleSelectMenu } from "../handlers/selectMenus"
-
-export function registerInteractionCreate(client: Client) {
-  client.on(Events.InteractionCreate, async (interaction) => {
-    if (interaction.isButton()) {
-      await handleButton(interaction)
-    }
-
-    if (interaction.isStringSelectMenu()) {
-      await handleSelectMenu(interaction)
-    }
-  })
-}
-```
-
----
-
-## Enviando o painel
-
-```ts
-const panel = buildPanel()
-
-interaction.reply(panel)
-```
-
----
-
-## Algumas boas práticas
-
-- Separe handlers sempre que possível
-- Evite colocar lógica grande dentro de eventos
-- Padronize customId com encode/decode
-- Use TypeScript para evitar erros comuns
-- Respeite os limites: máximo de **40 componentes** por mensagem e **4000 caracteres** de texto no total
- action: string
- userId?: string
- page?: number
-}
-
-export function encodeCustomId(data: CustomIdData) {
- return JSON.stringify(data)
-}
-
-export function decodeCustomId(id: string): CustomIdData | null {
- try {
-  return JSON.parse(id)
- } catch {
-  return null
- }
-}
-```
-
-Isso ajuda bastante quando o bot começa a crescer.
-
-
----
-
-# Criando o client
-
-```js
-import { Client, GatewayIntentBits } from "discord.js"
-
-export function createClient(){
- return new Client({
-  intents:[GatewayIntentBits.Guilds]
- })
-}
-```
-
-
----
-
-# Arquivo principal
-```js
-import "dotenv/config"
-import { createClient } from "./client/createClient"
-
-const client = createClient()
-
-client.once("clientReady",()=>{
- console.log(`Bot online ${client.user?.tag}`)
-})
-
-client.login(process.env.DISCORD_TOKEN)
-```
-
----
-
-# Criando um painel com botão e select
-
-**Aqui está um exemplo simples de painel usando botões e menu de seleção.**
-
-```js
-import {
- ActionRowBuilder,
- ButtonBuilder,
- ButtonStyle,
- StringSelectMenuBuilder,
- EmbedBuilder
-} from "discord.js"
-
-export function buildPanel(){
-
- const embed = new EmbedBuilder()
- .setTitle("Painel")
- .setDescription("Exemplo simples usando Components V2")
-
- const button = new ButtonBuilder()
- .setCustomId("config")
- .setLabel("Configurações")
- .setStyle(ButtonStyle.Primary)
-
- const select = new StringSelectMenuBuilder()
- .setCustomId("menu")
- .setPlaceholder("Escolha um módulo")
- .addOptions(
-  {label:"Tickets",value:"tickets"},
-  {label:"Logs",value:"logs"},
-  {label:"Moderação",value:"mod"}
- )
-
- const rowButtons = new ActionRowBuilder<ButtonBuilder>()
- .addComponents(button)
-
- const rowMenu = new ActionRowBuilder<StringSelectMenuBuilder>()
- .addComponents(select)
-
- return {
-  embeds:[embed],
-  components:[rowButtons,rowMenu]
- }
-}
-```
-
-
-
----
-
-# interactionCreate
-
-Aqui é onde o bot escuta os componentes sendo usados.
-
-```js
-client.on("interactionCreate",async interaction=>{
-
- if(interaction.isButton()){
-
-  if(interaction.customId === "config"){
-   await interaction.reply({
-    content:"Abrindo configuração",
-    ephemeral:true
-   })
-  }
-
- }
-
- if(interaction.isStringSelectMenu()){
-
-  const value = interaction.values[0]
-
-  if(value === "tickets"){
-   await interaction.reply({content:"Sistema de tickets"})
-  }
-
-  if(value === "logs"){
-   await interaction.reply({content:"Sistema de logs"})
-  }
-
- }
-
-})
-```
-
----
-
-# Enviando o painel
-
-```js
-const panel = buildPanel()
-
-interaction.reply(panel)
-```
-
----
-
-# Algumas boas práticas
-
-- Separe handlers sempre que possível
-- Evite colocar lógica grande dentro de eventos
-- Padronize customId
-- Use TypeScript para evitar erros comuns
+## Boas práticas
+
+- Separe handlers por tipo de interação para manter o evento enxuto
+- Evite lógica complexa dentro de eventos, delegue para funções específicas
+- Padronize os `customId` com encode/decode desde o início do projeto
+- Utilize TypeScript para garantir tipagem e evitar erros em tempo de execução
+- Respeite os limites do Discord: máximo de **40 componentes** por mensagem e **4000 caracteres** de texto no total
